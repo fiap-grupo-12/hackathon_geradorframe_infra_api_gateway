@@ -1,0 +1,21 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::851725289849:user/cloud_user"
+            },
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::terraform-tfstate-grupo12-fiap-2024-cesar1",
+                "arn:aws:s3:::terraform-tfstate-grupo12-fiap-2024-cesar1/*"
+            ]
+        }
+    ]
+}
