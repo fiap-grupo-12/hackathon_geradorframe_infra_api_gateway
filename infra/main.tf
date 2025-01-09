@@ -6,6 +6,11 @@ terraform {
       version = "~> 5.15"
     }
   }
+  backend "s3" {
+    bucket = "terraform-tfstate-grupo12-fiap-2024-cesar-202501091312"
+    key    = "api_gateway_terraform.tfstate"
+    region = "us-east-1"
+  }
 }
 
 provider "aws" {
@@ -17,7 +22,7 @@ resource "aws_cognito_user_pool" "gerador_de_frame_user_pool" {
   name = "gerador_de_frame_user_pool"
 
   password_policy {
-    minimum_length    = 8
+    minimum_length    = 6
     require_uppercase = false
     require_numbers   = false
     require_symbols   = false
@@ -150,7 +155,8 @@ resource "aws_api_gateway_method" "get_video_url_envio" {
   rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   resource_id   = aws_api_gateway_resource.url_envio.id
   http_method   = "GET"
-  authorization = "NONE"
+  authorization = "COGNITO_USER_POOLS" # Usando o Cognito como Authorizer
+  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
 }
 
 # Method Response for GET /video/url_envio
@@ -180,6 +186,7 @@ resource "aws_api_gateway_integration" "get_video_url_envio_integration" {
     }
     EOF
   }
+  depends_on = [aws_api_gateway_method_response.get_video_url_envio_200]
 }
 
 # Integration Response for GET /video/url_envio
@@ -200,14 +207,22 @@ resource "aws_api_gateway_integration_response" "get_video_url_envio_200" {
   response_parameters = {
     "method.response.header.Content-Type" = "'application/json'"
   }
+
+  depends_on = [
+    aws_api_gateway_integration.get_video_url_envio_integration,
+    aws_api_gateway_method_response.get_video_url_envio_200
+  ]
 }
 
 # Deployment
 resource "aws_api_gateway_deployment" "hackathon_geradorframe_deployment" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
+# Força o deploy sempre que o REST API ou os recursos dependentes mudarem
+  triggers = {
+    redeploy_trigger = "${timestamp()}" # Gera um valor único sempre que o Terraform é aplicado
+  }
   depends_on = [
     aws_api_gateway_integration.get_video_url_envio_integration,
-    aws_api_gateway_method_response.get_video_url_envio_200,
     aws_api_gateway_integration_response.get_video_url_envio_200
   ]
 }
@@ -221,6 +236,10 @@ resource "aws_api_gateway_stage" "prod" {
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
     format          = "RequestId: $context.requestId, Method: $context.httpMethod, Status: $context.status, Message: $context.error.message"
+  }
+  # Evita dependência cíclica e força o Terraform a destruir o stage antes do deployment
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
