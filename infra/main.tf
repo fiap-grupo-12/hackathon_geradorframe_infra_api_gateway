@@ -57,7 +57,7 @@ resource "aws_cognito_user_pool_client" "gerador_de_frame_user_pool_client" {
   generate_secret              = false
   supported_identity_providers = ["COGNITO"]
 
-  access_token_validity        = 1 
+  access_token_validity        = 1
   id_token_validity            = 1
   refresh_token_validity       = 720
 
@@ -70,7 +70,7 @@ resource "aws_cognito_user_pool_client" "gerador_de_frame_user_pool_client" {
   ]
 }
 
-# Cognito Domain
+# Cognito User Pool Domain
 resource "aws_cognito_user_pool_domain" "gerador_de_frame_domain" {
   domain       = "gerador-de-frame-domain"
   user_pool_id = aws_cognito_user_pool.gerador_de_frame_user_pool.id
@@ -88,7 +88,7 @@ resource "aws_cognito_identity_pool" "gerador_de_frame_identity_pool" {
   }
 }
 
-# IAM Role for API Gateway to access Cognito
+# IAM Role para API Gateway
 resource "aws_iam_role" "api_gateway_role" {
   name = "api_gateway_cognito_role"
 
@@ -127,18 +127,36 @@ resource "aws_api_gateway_rest_api" "hackathon_geradorframe_api" {
   description = "API Gateway for Hackathon GeradorFrame"
 }
 
-# API Gateway Resource: /video
-resource "aws_api_gateway_resource" "video" {
+# Recurso dinâmico /video/{proxy+}
+resource "aws_api_gateway_resource" "video_proxy" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   parent_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.root_resource_id
   path_part   = "video"
 }
 
-# API Gateway Resource: /video/url_envio
-resource "aws_api_gateway_resource" "url_envio" {
+resource "aws_api_gateway_resource" "proxy" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  parent_id   = aws_api_gateway_resource.video.id
-  path_part   = "url_envio"
+  parent_id   = aws_api_gateway_resource.video_proxy.id
+  path_part   = "{proxy+}" # Permite caminhos dinâmicos
+}
+
+# Método ANY para /video/{proxy+}
+resource "aws_api_gateway_method" "proxy_method" {
+  rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
+  resource_id   = aws_api_gateway_resource.proxy.id
+  http_method   = "ANY"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
+}
+
+# Integração Lambda
+resource "aws_api_gateway_integration" "proxy_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
+  resource_id             = aws_api_gateway_resource.proxy.id
+  http_method             = aws_api_gateway_method.proxy_method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arn
 }
 
 # Cognito Authorizer
@@ -150,80 +168,16 @@ resource "aws_api_gateway_authorizer" "cognito_authorizer" {
   identity_source        = "method.request.header.Authorization"
 }
 
-# GET Method for /video/url_envio
-resource "aws_api_gateway_method" "get_video_url_envio" {
-  rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  resource_id   = aws_api_gateway_resource.url_envio.id
-  http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS" # Usando o Cognito como Authorizer
-  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
-}
-
-# Method Response for GET /video/url_envio
-resource "aws_api_gateway_method_response" "get_video_url_envio_200" {
-  rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  resource_id = aws_api_gateway_resource.url_envio.id
-  http_method = aws_api_gateway_method.get_video_url_envio.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Content-Type" = true
-  }
-}
-
-# Mock Integration for GET /video/url_envio
-resource "aws_api_gateway_integration" "get_video_url_envio_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  resource_id             = aws_api_gateway_resource.url_envio.id
-  http_method             = aws_api_gateway_method.get_video_url_envio.http_method
-  type                    = "MOCK"
-  passthrough_behavior    = "WHEN_NO_MATCH"
-
-  request_templates = {
-    "application/json" = <<EOF
-    {
-      "statusCode": 200
-    }
-    EOF
-  }
-  depends_on = [aws_api_gateway_method_response.get_video_url_envio_200]
-}
-
-# Integration Response for GET /video/url_envio
-resource "aws_api_gateway_integration_response" "get_video_url_envio_200" {
-  rest_api_id             = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  resource_id             = aws_api_gateway_resource.url_envio.id
-  http_method             = aws_api_gateway_method.get_video_url_envio.http_method
-  status_code             = "200"
-
-  response_templates = {
-    "application/json" = <<EOF
-    {
-      "message": "Mock integration response"
-    }
-    EOF
-  }
-
-  response_parameters = {
-    "method.response.header.Content-Type" = "'application/json'"
-  }
-
-  depends_on = [
-    aws_api_gateway_integration.get_video_url_envio_integration,
-    aws_api_gateway_method_response.get_video_url_envio_200
-  ]
-}
-
 # Deployment
 resource "aws_api_gateway_deployment" "hackathon_geradorframe_deployment" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-# Força o deploy sempre que o REST API ou os recursos dependentes mudarem
+
   triggers = {
-    redeploy_trigger = "${timestamp()}" # Gera um valor único sempre que o Terraform é aplicado
+    redeploy_trigger = "${timestamp()}"
   }
+
   depends_on = [
-    aws_api_gateway_integration.get_video_url_envio_integration,
-    aws_api_gateway_integration_response.get_video_url_envio_200
+    aws_api_gateway_integration.proxy_integration
   ]
 }
 
@@ -237,34 +191,49 @@ resource "aws_api_gateway_stage" "prod" {
     destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
     format          = "RequestId: $context.requestId, Method: $context.httpMethod, Status: $context.status, Message: $context.error.message"
   }
-  # Evita dependência cíclica e força o Terraform a destruir o stage antes do deployment
+
   lifecycle {
     create_before_destroy = true
   }
 }
 
-# CloudWatch Logs for API Gateway
+# CloudWatch Logs para API Gateway
 resource "aws_cloudwatch_log_group" "api_gateway_logs" {
   name = "/aws/apigateway/hackathon_geradorframe_api"
 }
 
 # Outputs
-output "api_gateway_url" {
-  value = "${aws_api_gateway_stage.prod.invoke_url}/video/url_envio"
+output "api_gateway_base_url" {
+  description = "URL base do API Gateway"
+  value       = aws_api_gateway_stage.prod.invoke_url
+}
+
+output "exemplo_url_solicitar_url_envio" {
+  description = "Exemplo de URL para solicitar_url_envio"
+  value       = "${aws_api_gateway_stage.prod.invoke_url}/video/solicitar_url_envio"
+}
+
+output "exemplo_url_solicitar_url_imagens" {
+  description = "Exemplo de URL para solicitar_url_imagens"
+  value       = "${aws_api_gateway_stage.prod.invoke_url}/video/solicitar_url_imagens"
 }
 
 output "cognito_login_url" {
-  value = "https://${aws_cognito_user_pool_domain.gerador_de_frame_domain.domain}.auth.${var.aws_region}.amazoncognito.com/oauth2/authorize?response_type=code&client_id=${aws_cognito_user_pool_client.gerador_de_frame_user_pool_client.id}&redirect_uri=http://localhost"
+  description = "URL de login Cognito"
+  value       = "https://${aws_cognito_user_pool_domain.gerador_de_frame_domain.domain}.auth.${var.aws_region}.amazoncognito.com/oauth2/authorize?response_type=code&client_id=${aws_cognito_user_pool_client.gerador_de_frame_user_pool_client.id}&redirect_uri=http://localhost"
 }
 
 output "identity_pool_id" {
-  value = aws_cognito_identity_pool.gerador_de_frame_identity_pool.id
+  description = "ID do Identity Pool do Cognito"
+  value       = aws_cognito_identity_pool.gerador_de_frame_identity_pool.id
 }
 
 output "client_id" {
-  value = aws_cognito_user_pool_client.gerador_de_frame_user_pool_client.id
+  description = "ID do Client no Cognito"
+  value       = aws_cognito_user_pool_client.gerador_de_frame_user_pool_client.id
 }
 
 output "user_pool_id" {
-  value = aws_cognito_user_pool.gerador_de_frame_user_pool.id
+  description = "ID do User Pool do Cognito"
+  value       = aws_cognito_user_pool.gerador_de_frame_user_pool.id
 }
