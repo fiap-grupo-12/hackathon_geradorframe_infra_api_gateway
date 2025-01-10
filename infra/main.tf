@@ -177,7 +177,8 @@ resource "aws_api_gateway_deployment" "hackathon_geradorframe_deployment" {
   }
 
   depends_on = [
-    aws_api_gateway_integration.proxy_integration
+    aws_api_gateway_integration.proxy_integration,
+    aws_api_gateway_stage.prod
   ]
 }
 
@@ -188,7 +189,7 @@ resource "aws_api_gateway_stage" "prod" {
   stage_name    = "prod"
   lifecycle {
     create_before_destroy = true
-    ignore_changes = [deployment_id]
+    ignore_changes        = [deployment_id]
   }
 }
 
