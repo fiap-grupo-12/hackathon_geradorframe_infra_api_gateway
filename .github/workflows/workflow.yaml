@@ -2,7 +2,7 @@ name: 'Infra API'
 
 on:
   push:
-    branches: [ "release", "main" ]
+    branches: [ "release", "release/*", "main" ]
 
 permissions:
   contents: read
