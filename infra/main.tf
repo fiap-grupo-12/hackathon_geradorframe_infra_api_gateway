@@ -177,8 +177,7 @@ resource "aws_api_gateway_deployment" "hackathon_geradorframe_deployment" {
   }
 
   depends_on = [
-    aws_api_gateway_integration.proxy_integration,
-    aws_api_gateway_stage.prod
+    aws_api_gateway_integration.proxy_integration
   ]
 }
 
