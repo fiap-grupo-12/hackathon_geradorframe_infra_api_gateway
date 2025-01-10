@@ -7,7 +7,7 @@ terraform {
     }
   }
   backend "s3" {
-    bucket = "terraform-tfstate-grupo12-fiap-2024-cesar-202501091312"
+    bucket = "terraform-tfstate-grupo12-fiap-2024-cesar-20250110"
     key    = "api_gateway_terraform.tfstate"
     region = "us-east-1"
   }

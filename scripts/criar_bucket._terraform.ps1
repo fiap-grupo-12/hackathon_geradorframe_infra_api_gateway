@@ -1,5 +1,5 @@
 # Nome do bucket e região
-$bucketName = "terraform-tfstate-grupo12-fiap-2024-cesar-202501091312"
+$bucketName = "terraform-tfstate-grupo12-fiap-2024-cesar-20250110"
 $region = "us-east-1"
 
 # Comando para criar o bucket no S3
