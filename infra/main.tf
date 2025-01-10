@@ -194,6 +194,7 @@ resource "aws_api_gateway_stage" "prod" {
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes = [stage_name] # Ignore stage name conflicts
   }
 }
 
