@@ -186,12 +186,6 @@ resource "aws_api_gateway_stage" "prod" {
   deployment_id = aws_api_gateway_deployment.hackathon_geradorframe_deployment.id
   rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   stage_name    = "prod"
-
-  access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
-    format          = "RequestId: $context.requestId, Method: $context.httpMethod, Status: $context.status, Message: $context.error.message"
-  }
-
   lifecycle {
     create_before_destroy = true
     ignore_changes = [stage_name] # Ignore stage name conflicts
