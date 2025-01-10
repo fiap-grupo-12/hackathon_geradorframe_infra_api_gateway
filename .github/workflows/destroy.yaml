@@ -1,4 +1,4 @@
-name: 'Destroy API' 
+name: 'Destroy API'
 
 on:
   push:
