@@ -17,7 +17,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Cognito User Pool
+# Cognito User Pool -
 resource "aws_cognito_user_pool" "gerador_de_frame_user_pool" {
   name = "gerador_de_frame_user_pool"
 
