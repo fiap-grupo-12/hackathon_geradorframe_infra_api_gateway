@@ -24,9 +24,9 @@
 #OPÇÃO 3 - Powershell 
 # Defina as variáveis
 $USERNAME = ""  # Substitua pelo nome de usuário
-$CLIENT_ID = "5mkiipedoc60p0fot6ebkn4vn8"  # Substitua pelo seu Client ID
+$CLIENT_ID = "6vtfp4n9let691vmj1k61jnli2"  # Substitua pelo seu Client ID
 $PASSWORD = "123456"
-$USER_POOL_ID = "us-east-1_nz4mcgIwz"  # Substitua pelo seu User Pool ID
+$USER_POOL_ID = "us-east-1_SjtMSPWBm"  # Substitua pelo seu User Pool ID
 
 # Execute o comando AWS CLI
 aws cognito-idp admin-initiate-auth `

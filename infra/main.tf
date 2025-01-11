@@ -46,20 +46,20 @@ resource "aws_cognito_user_pool" "gerador_de_frame_user_pool" {
 
 # Cognito User Pool Client
 resource "aws_cognito_user_pool_client" "gerador_de_frame_user_pool_client" {
-  name                         = "gerador_de_frame_user_pool_client"
-  user_pool_id                 = aws_cognito_user_pool.gerador_de_frame_user_pool.id
-  allowed_oauth_flows          = ["code", "implicit"]
+  name                                 = "gerador_de_frame_user_pool_client"
+  user_pool_id                         = aws_cognito_user_pool.gerador_de_frame_user_pool.id
+  allowed_oauth_flows                  = ["code", "implicit"]
   allowed_oauth_flows_user_pool_client = true
-  allowed_oauth_scopes         = ["openid", "email", "profile"]
-  callback_urls                = ["http://localhost"]
-  logout_urls                  = ["http://localhost"]
-  default_redirect_uri         = "http://localhost"
-  generate_secret              = false
-  supported_identity_providers = ["COGNITO"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  callback_urls                        = ["http://localhost"]
+  logout_urls                          = ["http://localhost"]
+  default_redirect_uri                 = "http://localhost"
+  generate_secret                      = false
+  supported_identity_providers         = ["COGNITO"]
 
-  access_token_validity        = 1
-  id_token_validity            = 1
-  refresh_token_validity       = 720
+  access_token_validity  = 1
+  id_token_validity      = 1
+  refresh_token_validity = 720
 
   explicit_auth_flows = [
     "ALLOW_ADMIN_USER_PASSWORD_AUTH",
@@ -82,8 +82,8 @@ resource "aws_cognito_identity_pool" "gerador_de_frame_identity_pool" {
   allow_unauthenticated_identities = false
 
   cognito_identity_providers {
-    client_id              = aws_cognito_user_pool_client.gerador_de_frame_user_pool_client.id
-    provider_name          = "cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.gerador_de_frame_user_pool.id}"
+    client_id               = aws_cognito_user_pool_client.gerador_de_frame_user_pool_client.id
+    provider_name           = "cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.gerador_de_frame_user_pool.id}"
     server_side_token_check = true
   }
 }
@@ -96,8 +96,8 @@ resource "aws_iam_role" "api_gateway_role" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action    = "sts:AssumeRole"
-        Effect    = "Allow"
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
         Principal = {
           Service = "apigateway.amazonaws.com"
         }
@@ -107,8 +107,8 @@ resource "aws_iam_role" "api_gateway_role" {
 }
 
 resource "aws_iam_role_policy" "api_gateway_policy" {
-  name   = "api_gateway_cognito_policy"
-  role   = aws_iam_role.api_gateway_role.id
+  name = "api_gateway_cognito_policy"
+  role = aws_iam_role.api_gateway_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -161,24 +161,23 @@ resource "aws_api_gateway_integration" "proxy_integration" {
 
 # Cognito Authorizer
 resource "aws_api_gateway_authorizer" "cognito_authorizer" {
-  name                   = "CognitoAuthorizer"
-  rest_api_id            = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  type                   = "COGNITO_USER_POOLS"
-  provider_arns          = [aws_cognito_user_pool.gerador_de_frame_user_pool.arn]
-  identity_source        = "method.request.header.Authorization"
+  name            = "CognitoAuthorizer"
+  rest_api_id     = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
+  type            = "COGNITO_USER_POOLS"
+  provider_arns   = [aws_cognito_user_pool.gerador_de_frame_user_pool.arn]
+  identity_source = "method.request.header.Authorization"
 }
 
 # Deployment
 resource "aws_api_gateway_deployment" "hackathon_geradorframe_deployment" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-
-  triggers = {
-    redeploy_trigger = "${timestamp()}"
+  depends_on = [ aws_api_gateway_method.proxy_method ]
+  variables = {
+    build_time = timestamp()
   }
-
-  depends_on = [
-    aws_api_gateway_integration.proxy_integration
-  ]
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Stage
@@ -186,10 +185,7 @@ resource "aws_api_gateway_stage" "prod" {
   deployment_id = aws_api_gateway_deployment.hackathon_geradorframe_deployment.id
   rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   stage_name    = "prod"
-  lifecycle {
-    create_before_destroy = true
-    ignore_changes        = [deployment_id]
-  }
+  description = "Production stage updated at: ${timestamp()}"
 }
 
 # CloudWatch Logs para API Gateway
