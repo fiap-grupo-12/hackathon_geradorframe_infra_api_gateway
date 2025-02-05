@@ -7,7 +7,7 @@ terraform {
     }
   }
   backend "s3" {
-    bucket = "terraform-tfstate-grupo12-fiap-2024-matsui"
+    bucket = "tfstate-grupo12-fiap-20251"
     key    = "api_gateway_terraform.tfstate"
     region = "sa-east-1"
   }
