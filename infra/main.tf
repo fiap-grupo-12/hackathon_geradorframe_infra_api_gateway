@@ -7,14 +7,19 @@ terraform {
     }
   }
   backend "s3" {
-    bucket = "terraform-tfstate-grupo12-fiap-2024-cesar-20250110"
+    bucket = "terraform-tfstate-grupo12-fiap-2024-matsui"
     key    = "api_gateway_terraform.tfstate"
-    region = "us-east-1"
+    region = "sa-east-1"
   }
 }
 
 provider "aws" {
   region = var.aws_region
+}
+
+#Buscando as Lambdas
+data "aws_lambda_function" "lambda_api" {
+  function_name = "lambda_api_function"
 }
 
 # Cognito User Pool -
@@ -156,7 +161,7 @@ resource "aws_api_gateway_integration" "proxy_integration" {
   http_method             = aws_api_gateway_method.proxy_method.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = var.lambda_invoke_arn
+  uri                     = "arn:aws:apigateway:${var.region}:lambda:path/2015-03-31/functions/${data.aws_lambda_function.lambda_api.arn}/invocations"
 }
 
 # Cognito Authorizer
