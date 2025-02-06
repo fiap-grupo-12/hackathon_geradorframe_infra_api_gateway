@@ -136,7 +136,16 @@ resource "aws_api_gateway_rest_api" "hackathon_geradorframe_api" {
 resource "aws_api_gateway_resource" "video_proxy" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   parent_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.root_resource_id
-  path_part   = "video"
+  path_part   = ""
+}
+
+# Método ANY para //{proxy+}
+resource "aws_api_gateway_method" "proxy_method" {
+  rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
+  resource_id   = aws_api_gateway_resource.video_proxy.id
+  http_method   = "ANY"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
 }
 
 resource "aws_api_gateway_resource" "proxy" {
@@ -197,6 +206,7 @@ resource "aws_api_gateway_stage" "prod" {
 resource "aws_cloudwatch_log_group" "api_gateway_logs" {
   name = "/aws/apigateway/hackathon_geradorframe_api"
 }
+
 
 # Outputs
 output "api_gateway_base_url" {
