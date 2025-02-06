@@ -139,7 +139,7 @@ resource "aws_api_gateway_resource" "video_proxy" {
   path_part   = ""
 }
 
-# Método ANY para //{proxy+}
+# Método ANY para /
 resource "aws_api_gateway_method" "proxy_method" {
   rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   resource_id   = aws_api_gateway_resource.video_proxy.id
@@ -155,7 +155,7 @@ resource "aws_api_gateway_resource" "proxy" {
 }
 
 # Método ANY para /video/{proxy+}
-resource "aws_api_gateway_method" "proxy_method" {
+resource "aws_api_gateway_proxy_method" "proxy_method" {
   rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
@@ -167,7 +167,7 @@ resource "aws_api_gateway_method" "proxy_method" {
 resource "aws_api_gateway_integration" "proxy_integration" {
   rest_api_id             = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   resource_id             = aws_api_gateway_resource.proxy.id
-  http_method             = aws_api_gateway_method.proxy_method.http_method
+  http_method             = aws_api_gateway_proxy_method.proxy_method.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${data.aws_lambda_function.lambda_api.arn}/invocations"
@@ -185,7 +185,7 @@ resource "aws_api_gateway_authorizer" "cognito_authorizer" {
 # Deployment
 resource "aws_api_gateway_deployment" "hackathon_geradorframe_deployment" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  depends_on = [ aws_api_gateway_method.proxy_method ]
+  depends_on = [ aws_api_gateway_proxy_method.proxy_method ]
   variables = {
     build_time = timestamp()
   }
@@ -209,6 +209,11 @@ resource "aws_cloudwatch_log_group" "api_gateway_logs" {
 
 
 # Outputs
+output "lambda_arn" {
+  description = "ARN da Lambda"
+  value       = aws_lambda_function.lambda_api.arn
+}
+
 output "api_gateway_base_url" {
   description = "URL base do API Gateway"
   value       = aws_api_gateway_stage.prod.invoke_url
