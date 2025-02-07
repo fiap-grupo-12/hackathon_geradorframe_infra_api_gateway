@@ -133,44 +133,58 @@ resource "aws_api_gateway_rest_api" "hackathon_geradorframe_api" {
 }
 
 # Recurso dinâmico /video/{proxy+}
-resource "aws_api_gateway_resource" "video_proxy" {
-  rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  parent_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.root_resource_id
-  path_part   = ""
-}
+# resource "aws_api_gateway_resource" "video_proxy" {
+#  rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
+#  parent_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.root_resource_id
+#  path_part   = "video"
+#}
 
-# Método ANY para /
-resource "aws_api_gateway_method" "proxy_method" {
+# Create the root method (/) with ANY method and Cognito Authorizer
+resource "aws_api_gateway_method" "root_any_method" {
   rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  resource_id   = aws_api_gateway_resource.video_proxy.id
+  resource_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.root_resource_id
   http_method   = "ANY"
   authorization = "COGNITO_USER_POOLS"
   authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
 }
 
+# Integrate the root method with Lambda
+resource "aws_api_gateway_integration" "root_lambda_integration" {
+  rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
+  resource_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.root_resource_id
+  http_method = aws_api_gateway_method.root_any_method.http_method
+  type        = "AWS_PROXY"
+
+  integration_http_method = "POST"
+  uri                     = data.aws_lambda_function.lambda_api.invoke_arn
+}
+
+# Create a proxy resource (path "/{proxy+}")
 resource "aws_api_gateway_resource" "proxy" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  parent_id   = aws_api_gateway_resource.video_proxy.id
+  parent_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.root_resource_id
   path_part   = "{proxy+}" # Permite caminhos dinâmicos
 }
 
-# Método ANY para /video/{proxy+}
-resource "aws_api_gateway_proxy_method" "proxy_method" {
+# Create a method for the proxy resource (path "/{proxy+}") with ANY method
+resource "aws_api_gateway_method" "proxy_method" {
   rest_api_id   = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
+  authorization = "NONE"
+  #authorization = "COGNITO_USER_POOLS"
+  #authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
 }
 
 # Integração Lambda
 resource "aws_api_gateway_integration" "proxy_integration" {
   rest_api_id             = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
   resource_id             = aws_api_gateway_resource.proxy.id
-  http_method             = aws_api_gateway_proxy_method.proxy_method.http_method
+  http_method             = aws_api_gateway_method.proxy_method.http_method
   integration_http_method = "POST"
+
   type                    = "AWS_PROXY"
-  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${data.aws_lambda_function.lambda_api.arn}/invocations"
+  uri                     = data.aws_lambda_function.lambda_api.invoke_arn
 }
 
 # Cognito Authorizer
@@ -185,7 +199,10 @@ resource "aws_api_gateway_authorizer" "cognito_authorizer" {
 # Deployment
 resource "aws_api_gateway_deployment" "hackathon_geradorframe_deployment" {
   rest_api_id = aws_api_gateway_rest_api.hackathon_geradorframe_api.id
-  depends_on = [ aws_api_gateway_proxy_method.proxy_method ]
+  depends_on = [ 
+    aws_api_gateway_method.root_any_method,
+    aws_api_gateway_method.proxy_method
+    ]
   variables = {
     build_time = timestamp()
   }
@@ -202,18 +219,22 @@ resource "aws_api_gateway_stage" "prod" {
   description = "Production stage updated at: ${timestamp()}"
 }
 
+# Attach necessary IAM Role for API Gateway to invoke Lambda
+resource "aws_lambda_permission" "api_gateway_lambda" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = data.aws_lambda_function.lambda_api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.hackathon_geradorframe_api.execution_arn}/*/*"
+}
+
+
 # CloudWatch Logs para API Gateway
 resource "aws_cloudwatch_log_group" "api_gateway_logs" {
   name = "/aws/apigateway/hackathon_geradorframe_api"
 }
 
-
 # Outputs
-output "lambda_arn" {
-  description = "ARN da Lambda"
-  value       = aws_lambda_function.lambda_api.arn
-}
-
 output "api_gateway_base_url" {
   description = "URL base do API Gateway"
   value       = aws_api_gateway_stage.prod.invoke_url
